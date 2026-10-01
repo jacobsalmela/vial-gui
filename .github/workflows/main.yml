@@ -58,9 +58,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
-        python-version: '3.6.x'
+        python-version: '3.12'
 
     - name: Setup venv
       run: |
@@ -83,7 +83,7 @@ jobs:
     - name: Build
       run: |
         . .\venv\Scripts\activate.ps1
-        fbs freeze
+        pyinstaller --noconfirm --distpath target --workpath target/PyInstaller vial.spec
         Compress-Archive -Path "target\Vial" -DestinationPath vial-win.zip
 
     - uses: actions/upload-artifact@v4
@@ -94,8 +94,12 @@ jobs:
     - name: Create installer
       run: |
         $env:Path += ";C:\Program Files (x86)\NSIS"
-        . .\venv\Scripts\activate.ps1
-        fbs installer
+        $settings = Get-Content src\build\settings\base.json | ConvertFrom-Json
+        New-Item -ItemType Directory -Force target\installer | Out-Null
+        Copy-Item src\installer\windows\* target\installer
+        # makensis runs from the script's directory, so ..\Vial and ..\VialSetup.exe resolve inside target\
+        makensis /V2 "/Dapp_name=$($settings.app_name)" "/Dauthor=$($settings.author)" "/Dinstaller=$($settings.app_name)Setup.exe" target\installer\Installer.nsi
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     - uses: actions/upload-artifact@v4
       with:
