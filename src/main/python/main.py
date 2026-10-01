@@ -11,6 +11,7 @@ import traceback
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import pyqtSignal
 
+import multiprocessing
 import sys
 from functools import cached_property
 
@@ -70,6 +71,9 @@ class VialApplicationContext(ApplicationContext):
         return result
 
 if __name__ == '__main__':
+    # multiprocessing re-executes the frozen app for its helper processes (e.g. the resource tracker)
+    multiprocessing.freeze_support()
+
     if len(sys.argv) == 2 and sys.argv[1] == "--linux-recorder":
         from linux_keystroke_recorder import linux_keystroke_recorder
 
