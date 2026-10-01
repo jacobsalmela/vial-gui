@@ -48,5 +48,5 @@ To run the tests:
 ```
 source venv/bin/activate
 pip install -r test-requirements.txt
-pytest src/main/python/test
+QT_QPA_PLATFORM=offscreen pytest src/main/python/test
 ```
