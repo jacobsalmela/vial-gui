@@ -57,6 +57,13 @@ a = Analysis(
     datas=datas,
     noarchive=False,
 )
+if sys.platform.startswith("linux"):
+    # Use the host's copies of these. Bundled ones break Popen() and GPU drivers on distros whose
+    # libc/libstdc++ differ from the build machine (same list as fbs), and an old fontconfig cannot
+    # parse newer distros' /etc/fonts (per the AppImage excludelist)
+    host_libs = ("libstdc++.so", "libtinfo.so", "libreadline.so", "libdrm.so", "libfontconfig.so", "libfreetype.so")
+    a.binaries = [b for b in a.binaries if not os.path.basename(b[0]).startswith(host_libs)]
+
 pyz = PYZ(a.pure)
 
 if sys.platform == "darwin":
