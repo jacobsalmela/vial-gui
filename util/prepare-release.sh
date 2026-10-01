@@ -11,9 +11,13 @@ unzip vial-linux.zip
 rm vial-linux.zip
 mv Vial-x86_64.AppImage Vial-v$VER-x86_64.AppImage
 
-unzip vial-mac.zip
-rm vial-mac.zip
-mv vial-mac.dmg Vial-v$VER.dmg
+unzip vial-mac-arm64.zip
+rm vial-mac-arm64.zip
+mv vial-mac-arm64.dmg Vial-v$VER-arm64.dmg
+
+unzip vial-mac-x86_64.zip
+rm vial-mac-x86_64.zip
+mv vial-mac-x86_64.dmg Vial-v$VER-x86_64.dmg
 
 unzip vial-win-installer.zip
 rm vial-win-installer.zip
