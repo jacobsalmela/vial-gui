@@ -43,6 +43,8 @@ source venv/bin/activate
 pyinstaller --noconfirm --distpath target --workpath target/PyInstaller vial.spec
 ```
 
+Or run `make app`, which creates the venv if needed and does a clean rebuild.
+
 To run the tests:
 
 ```
