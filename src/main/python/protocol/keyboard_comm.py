@@ -9,8 +9,9 @@ from kle_serial import Serial as KleSerial
 from protocol.alt_repeat_key import ProtocolAltRepeatKey
 from protocol.combo import ProtocolCombo
 from protocol.constants import CMD_VIA_GET_PROTOCOL_VERSION, CMD_VIA_GET_KEYBOARD_VALUE, CMD_VIA_SET_KEYBOARD_VALUE, \
-    CMD_VIA_SET_KEYCODE, CMD_VIA_LIGHTING_SET_VALUE, CMD_VIA_LIGHTING_GET_VALUE, CMD_VIA_LIGHTING_SAVE, \
-    CMD_VIA_GET_LAYER_COUNT, CMD_VIA_KEYMAP_GET_BUFFER, CMD_VIA_VIAL_PREFIX, VIA_LAYOUT_OPTIONS, \
+    CMD_VIA_GET_KEYCODE, CMD_VIA_SET_KEYCODE, CMD_VIA_LIGHTING_SET_VALUE, CMD_VIA_LIGHTING_GET_VALUE, \
+    CMD_VIA_LIGHTING_SAVE, CMD_VIA_GET_LAYER_COUNT, CMD_VIA_KEYMAP_GET_BUFFER, CMD_VIA_VIAL_PREFIX, \
+    VIA_LAYOUT_OPTIONS, \
     VIA_SWITCH_MATRIX_STATE, QMK_BACKLIGHT_BRIGHTNESS, QMK_BACKLIGHT_EFFECT, QMK_RGBLIGHT_BRIGHTNESS, \
     QMK_RGBLIGHT_EFFECT, QMK_RGBLIGHT_EFFECT_SPEED, QMK_RGBLIGHT_COLOR, VIALRGB_GET_INFO, VIALRGB_GET_MODE, \
     VIALRGB_GET_SUPPORTED, VIALRGB_SET_MODE, CMD_VIAL_GET_KEYBOARD_ID, CMD_VIAL_GET_SIZE, CMD_VIAL_GET_DEFINITION, \
@@ -316,9 +317,17 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
             if code == RESET_KEYCODE:
                 Unlocker.unlock(self)
 
-            self.usb_send(self.dev, struct.pack(">BBBBH", CMD_VIA_SET_KEYCODE, layer, row, col,
-                                                Keycode.deserialize(code)), retries=20)
+            requested = Keycode.deserialize(code)
+            self.usb_send(self.dev, struct.pack(">BBBBH", CMD_VIA_SET_KEYCODE, layer, row, col, requested),
+                          retries=20)
+            # read the keycode back, firmware may refuse to store keycodes it doesn't support
+            data = self.usb_send(self.dev, struct.pack("BBBB", CMD_VIA_GET_KEYCODE, layer, row, col), retries=20)
+            stored = struct.unpack(">H", data[4:6])[0]
+            if stored != requested:
+                self.layout[key] = Keycode.serialize(stored)
+                return False
             self.layout[key] = code
+        return True
 
     def set_encoder(self, layer, index, direction, code):
         key = (layer, index, direction)
@@ -326,9 +335,18 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
             if code == RESET_KEYCODE:
                 Unlocker.unlock(self)
 
+            requested = Keycode.deserialize(code)
             self.usb_send(self.dev, struct.pack(">BBBBBH", CMD_VIA_VIAL_PREFIX, CMD_VIAL_SET_ENCODER,
-                                                layer, index, direction, Keycode.deserialize(code)), retries=20)
+                                                layer, index, direction, requested), retries=20)
+            # read the keycode back, firmware may refuse to store keycodes it doesn't support
+            data = self.usb_send(self.dev, struct.pack("BBBB", CMD_VIA_VIAL_PREFIX, CMD_VIAL_GET_ENCODER, layer, index),
+                                 retries=20)
+            stored = struct.unpack(">H", data[direction * 2:direction * 2 + 2])[0]
+            if stored != requested:
+                self.encoder_layout[key] = Keycode.serialize(stored)
+                return False
             self.encoder_layout[key] = code
+        return True
 
     def set_layout_options(self, options):
         if self.layout_options != -1 and self.layout_options != options:
@@ -407,22 +425,27 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
         return json.dumps(data).encode("utf-8")
 
     def restore_layout(self, data):
-        """ Restores saved layout """
+        """ Restores saved layout, returns a list of (requested, stored) keycodes the firmware refused """
 
         data = json.loads(data.decode("utf-8"))
+        rejected = []
 
         # restore keymap
         for l, layer in enumerate(data["layout"]):
             for r, row in enumerate(layer):
                 for c, code in enumerate(row):
                     if (l, r, c) in self.layout:
-                        self.set_key(l, r, c, Keycode.serialize(Keycode.deserialize(code)))
+                        code = Keycode.serialize(Keycode.deserialize(code))
+                        if not self.set_key(l, r, c, code):
+                            rejected.append((code, self.layout[(l, r, c)]))
 
         # restore encoders
         for l, layer in enumerate(data["encoder_layout"]):
             for e, encoder in enumerate(layer):
-                self.set_encoder(l, e, 0, Keycode.serialize(Keycode.deserialize(encoder[0])))
-                self.set_encoder(l, e, 1, Keycode.serialize(Keycode.deserialize(encoder[1])))
+                for d in range(2):
+                    code = Keycode.serialize(Keycode.deserialize(encoder[d]))
+                    if not self.set_encoder(l, e, d, code):
+                        rejected.append((code, self.encoder_layout[(l, e, d)]))
 
         self.set_layout_options(data["layout_options"])
         self.restore_macros(data.get("macro"))
@@ -438,6 +461,8 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
             qsid = int(qsid)
             if QmkSettings.is_qsid_supported(qsid):
                 self.qmk_settings_set(qsid, value)
+
+        return rejected
 
     def reset(self):
         self.usb_send(self.dev, struct.pack("B", 0xB))

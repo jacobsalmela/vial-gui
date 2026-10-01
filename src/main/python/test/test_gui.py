@@ -12,8 +12,8 @@ from protocol.constants import CMD_VIA_GET_PROTOCOL_VERSION, CMD_VIA_VIAL_PREFIX
     CMD_VIAL_GET_SIZE, CMD_VIAL_GET_DEFINITION, CMD_VIA_GET_LAYER_COUNT, CMD_VIA_MACRO_GET_COUNT, \
     CMD_VIA_MACRO_GET_BUFFER_SIZE, CMD_VIAL_QMK_SETTINGS_QUERY, CMD_VIAL_DYNAMIC_ENTRY_OP, \
     DYNAMIC_VIAL_GET_NUMBER_OF_ENTRIES, CMD_VIA_KEYMAP_GET_BUFFER, CMD_VIA_MACRO_GET_BUFFER, CMD_VIAL_GET_UNLOCK_STATUS, \
-    CMD_VIA_SET_KEYCODE, DYNAMIC_VIAL_COMBO_GET, DYNAMIC_VIAL_COMBO_SET, DYNAMIC_VIAL_TAP_DANCE_GET, \
-    DYNAMIC_VIAL_TAP_DANCE_SET
+    CMD_VIA_GET_KEYCODE, CMD_VIA_SET_KEYCODE, DYNAMIC_VIAL_COMBO_GET, DYNAMIC_VIAL_COMBO_SET, \
+    DYNAMIC_VIAL_TAP_DANCE_GET, DYNAMIC_VIAL_TAP_DANCE_SET
 from widgets.square_button import SquareButton
 
 FAKE_KEYBOARD = """
@@ -143,6 +143,9 @@ class VirtualKeyboard:
             layer, row, col, kc = struct.unpack_from(">BBBH", msg[1:])
             self.keymap[layer][row][col] = kc
             return b""
+        elif msg[0] == CMD_VIA_GET_KEYCODE:
+            layer, row, col = struct.unpack_from(">BBB", msg[1:])
+            return msg[0:4] + struct.pack(">H", self.keymap[layer][row][col])
         elif msg[0] == CMD_VIA_MACRO_GET_COUNT:
             return struct.pack(">BB", msg[0], self.macro_count)
         elif msg[0] == CMD_VIA_MACRO_GET_BUFFER_SIZE:

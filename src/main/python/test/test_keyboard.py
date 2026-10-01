@@ -1,3 +1,4 @@
+import json
 import unittest
 import lzma
 import struct
@@ -139,6 +140,7 @@ class TestKeyboard(unittest.TestCase):
 
         kb, dev = self.prepare_keyboard(LAYOUT_2x2, [[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
         dev.expect("050101000009", "")
+        dev.expect("04010100", "040101000009")
         kb.set_key(1, 1, 0, 9)
         self.assertEqual(kb.layout[(1, 1, 0)], 9)
 
@@ -149,10 +151,37 @@ class TestKeyboard(unittest.TestCase):
 
         kb, dev = self.prepare_keyboard(LAYOUT_2x2, [[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
         dev.expect("050101000009", "")
+        dev.expect("04010100", "040101000009")
         kb.set_key(1, 1, 0, 9)
         kb.set_key(1, 1, 0, 9)
         self.assertEqual(kb.layout[(1, 1, 0)], 9)
 
+        dev.finish()
+
+    def test_set_key_rejected(self):
+        """ Tests that a keycode the firmware refuses to store is reported and not cached """
+
+        kb, dev = self.prepare_keyboard(LAYOUT_2x2, [[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
+        dev.expect("050101005801", "")
+        dev.expect("04010100", "040101000000")
+        self.assertFalse(kb.set_key(1, 1, 0, "TT(1)"))
+        self.assertEqual(kb.layout[(1, 1, 0)], Keycode.serialize(0))
+
+        dev.finish()
+
+    def test_layout_restore_rejected(self):
+        """ Tests that restoring a layout reports keycodes the firmware refused to store """
+
+        kb, dev = self.prepare_keyboard(LAYOUT_2x2, [[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
+        data = json.loads(kb.save_layout())
+        data["layout"][1][1][0] = "TT(1)"
+        dev.finish()
+
+        kb, dev = self.prepare_keyboard(LAYOUT_2x2, [[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
+        dev.expect("050101005801", "")
+        dev.expect("04010100", "040101000000")
+        self.assertEqual(kb.restore_layout(json.dumps(data).encode("utf-8")), [("TT(1)", Keycode.serialize(0))])
+        self.assertEqual(kb.layout[(1, 1, 0)], Keycode.serialize(0))
         dev.finish()
 
     def test_layout_save_restore(self):
@@ -160,6 +189,7 @@ class TestKeyboard(unittest.TestCase):
 
         kb, dev = self.prepare_keyboard(LAYOUT_2x2, [[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
         dev.expect("05010100000A", "")
+        dev.expect("04010100", "04010100000A")
         kb.set_key(1, 1, 0, Keycode.serialize(10))
         self.assertEqual(kb.layout[(1, 1, 0)], Keycode.serialize(10))
         data = kb.save_layout()
@@ -167,6 +197,7 @@ class TestKeyboard(unittest.TestCase):
 
         kb, dev = self.prepare_keyboard(LAYOUT_2x2, [[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
         dev.expect("05010100000A", "")
+        dev.expect("04010100", "04010100000A")
         kb.restore_layout(data)
         self.assertEqual(kb.layout[(1, 1, 0)], Keycode.serialize(10))
         dev.finish()
@@ -192,5 +223,17 @@ class TestKeyboard(unittest.TestCase):
         self.assertEqual(kb.encoder_layout[(1, 0, 0)], Keycode.serialize(12))
         self.assertEqual(kb.encoder_layout[(1, 0, 1)], Keycode.serialize(13))
         dev.expect("FE040100010020", "")
+        dev.expect("FE030100", "000C0020")
         kb.set_encoder(1, 0, 1, Keycode.serialize(0x20))
         self.assertEqual(kb.encoder_layout[(1, 0, 1)], Keycode.serialize(0x20))
+        dev.finish()
+
+    def test_encoder_change_rejected(self):
+        """ Test that an encoder keycode the firmware refuses to store is reported and not cached """
+
+        kb, dev = self.prepare_keyboard(LAYOUT_ENCODER, [[[1]], [[2]], [[3]], [[4]]], [[(10, 11)], [(12, 13)], [(14, 15)], [(16, 17)]])
+        dev.expect("FE040100015801", "")
+        dev.expect("FE030100", "000C0000")
+        self.assertFalse(kb.set_encoder(1, 0, 1, "TT(1)"))
+        self.assertEqual(kb.encoder_layout[(1, 0, 1)], Keycode.serialize(0))
+        dev.finish()

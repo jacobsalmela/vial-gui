@@ -32,9 +32,11 @@ class DummyKeyboard(Keyboard):
 
     def set_key(self, layer, row, col, code):
         self.layout[(layer, row, col)] = code
+        return True
 
     def set_encoder(self, layer, index, direction, code):
         self.encoder_layout[(layer, index, direction)] = code
+        return True
 
     def set_layout_options(self, options):
         if self.layout_options != -1 and self.layout_options != options:

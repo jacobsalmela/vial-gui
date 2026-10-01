@@ -141,8 +141,17 @@ class KeymapEditor(BasicEditor):
                                        QMessageBox.Yes | QMessageBox.No)
             if ret != QMessageBox.Yes:
                 return
-        self.keyboard.restore_layout(data)
+        rejected = self.keyboard.restore_layout(data)
         self.refresh_layer_display()
+        if rejected:
+            self.warn_rejected(rejected)
+
+    def warn_rejected(self, rejected):
+        """ Warns that the firmware stored different keycodes than requested, given (requested, stored) pairs """
+        details = "\n".join("{} \u2192 {}".format(requested, stored) for requested, stored in rejected)
+        QMessageBox.warning(self.widget(), "",
+                            tr("KeymapEditor", "The keyboard firmware did not accept the following keycodes, "
+                                               "they were stored as shown instead:") + "\n\n" + details)
 
     def on_any_keycode(self):
         if self.container.active_key is None:
@@ -214,7 +223,8 @@ class KeymapEditor(BasicEditor):
                 return
             keycode = kc.qmk_id.replace("(kc)", "({})".format(keycode))
 
-        self.keyboard.set_encoder(l, i, d, keycode)
+        if not self.keyboard.set_encoder(l, i, d, keycode):
+            self.warn_rejected([(keycode, self.keyboard.encoder_layout[(l, i, d)])])
         self.refresh_layer_display()
 
     def set_key_matrix(self, keycode):
@@ -230,7 +240,8 @@ class KeymapEditor(BasicEditor):
                     return
                 keycode = kc.qmk_id.replace("(kc)", "({})".format(keycode))
 
-            self.keyboard.set_key(l, r, c, keycode)
+            if not self.keyboard.set_key(l, r, c, keycode):
+                self.warn_rejected([(keycode, self.keyboard.layout[(l, r, c)])])
             self.refresh_layer_display()
 
     def on_key_clicked(self):
