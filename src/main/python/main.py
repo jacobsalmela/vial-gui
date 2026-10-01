@@ -11,11 +11,10 @@ import traceback
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import pyqtSignal
 
-from fbs_runtime.application_context import cached_property
-from fbs_runtime.application_context.PyQt5 import ApplicationContext
-
 import sys
+from functools import cached_property
 
+from appcontext import ApplicationContext
 from main_window import MainWindow
 
 
