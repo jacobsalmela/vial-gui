@@ -36,7 +36,7 @@ source venv/bin/activate
 python src/main/python/main.py
 ```
 
-To build a standalone app (`target/Vial.app` on macOS, `target/Vial/` elsewhere):
+To build a standalone app (`target/Vial.app` on macOS, `target/Vial/` elsewhere; the Linux AppImage is built with `util/linux-builder/build-in-docker.sh`):
 
 ```
 source venv/bin/activate

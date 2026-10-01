@@ -1,0 +1,6 @@
+.git
+venv
+docker_venv
+target
+util/python
+util/linux-builder/output
